@@ -1,0 +1,85 @@
+
+ RUN  v5.1.0 C:/Users/ioshu/faculdade/integracao-aplicacao-api-rest/entregas-api
+
+ ✓ tests/integracao-pedidos.test.ts > inclusão: pedido CONFIRMADO novo cria a entrega > cria a entrega só com o que o G5 fornece e marca o restante como pendência 206ms
+ ✓ tests/integracao-pedidos.test.ts > inclusão: pedido CONFIRMADO novo cria a entrega > é idempotente: reexecutar não duplica e conta como sem alteração 117ms
+ ✓ tests/integracao-pedidos.test.ts > inclusão: pedido CONFIRMADO novo cria a entrega > lê todas as páginas da API do G5 1603ms
+ ✓ tests/integracao-pedidos.test.ts > inclusão: pedido CONFIRMADO novo cria a entrega > importações simultâneas criam cada entrega uma única vez 152ms
+ ✓ tests/integracao-pedidos.test.ts > inclusão: pedido CONFIRMADO novo cria a entrega > normaliza UF minúscula e espaços nas pontas 96ms
+ ✓ tests/integracao-pedidos.test.ts > inclusão: pedido CONFIRMADO novo cria a entrega > CANCELADO que nunca chegou confirmado é ignorado, sem erro 85ms
+ ✓ tests/integracao-pedidos.test.ts > validação dos dados do G5 (Contrato B) > rejeita cada pedido inválido com o tipo de erro certo e importa os válidos 140ms
+ ✓ tests/integracao-pedidos.test.ts > validação dos dados do G5 (Contrato B) > pedido rejeitado volta a ser lido: depois que o G5 corrige, ele entra 93ms
+ ✓ tests/integracao-pedidos.test.ts > validação dos dados do G5 (Contrato B) > rejeita todas as cópias de um codigo_pedido repetido na leitura (REGISTRO_DUPLICADO) 96ms
+ ✓ tests/integracao-pedidos.test.ts > validação dos dados do G5 (Contrato B) > registra conflito quando já existe entrega ativa com o mesmo id_pedido 93ms
+ ✓ tests/integracao-pedidos.test.ts > atualização e cancelamento > data_atualizacao mais recente atualiza o endereço da entrega ainda editável 130ms
+ ✓ tests/integracao-pedidos.test.ts > atualização e cancelamento > atualização preserva o que o G7 já completou via PUT 208ms
+ ✓ tests/integracao-pedidos.test.ts > atualização e cancelamento > data_atualizacao mais antiga que a gravada é rejeitada (REGRA_NEGOCIO) 98ms
+ ✓ tests/integracao-pedidos.test.ts > atualização e cancelamento > endereço alterado com a entrega em andamento: rejeitado para tratamento manual, e continua pendente 206ms
+ ✓ tests/integracao-pedidos.test.ts > atualização e cancelamento > pedido CANCELADO no G5 cancela a entrega ainda não saída e registra no histórico 138ms
+ ✓ tests/integracao-pedidos.test.ts > atualização e cancelamento > pedido cancelado com a entrega já em rota: rejeitado para decisão manual, entrega intacta 136ms
+ ✓ tests/integracao-pedidos.test.ts > atualização e cancelamento > pedido CANCELADO não volta a CONFIRMADO 129ms
+ ✓ tests/integracao-pedidos.test.ts > atualização e cancelamento > entrega excluída (DELETE) some de pedidos_importados e o pedido é importado de novo 113ms
+ ✓ tests/integracao-pedidos.test.ts > completar pendências via PUT > PUT preenche os campos pendentes e zera pendencias 93ms
+ ✓ tests/integracao-pedidos.test.ts > falhas de comunicação com o G5 > repete após 503 e conclui; cada tentativa fica registrada 128ms
+ ✓ tests/integracao-pedidos.test.ts > falhas de comunicação com o G5 > desiste após esgotar as tentativas e responde 503 sem derrubar a API 114ms
+ ✓ tests/integracao-pedidos.test.ts > falhas de comunicação com o G5 > G5 fora do ar (conexão recusada): 503 INTEGRACAO_INDISPONIVEL 114ms
+ ✓ tests/integracao-pedidos.test.ts > falhas de comunicação com o G5 > timeout: repete e registra TIMEOUT 438ms
+ ✓ tests/integracao-pedidos.test.ts > falhas de comunicação com o G5 > 500 é repetido uma vez só 118ms
+ ✓ tests/integracao-pedidos.test.ts > falhas de comunicação com o G5 > 401 do G5 não é repetido: 502 INTEGRACAO_AUTENTICACAO 56ms
+ ✓ tests/integracao-pedidos.test.ts > falhas de comunicação com o G5 > corpo que não é JSON ou fora do formato combinado: violação de contrato (502) 74ms
+ ✓ tests/integracao-pedidos.test.ts > falhas de comunicação com o G5 > G5 cai na segunda página: a importação falha inteira (503), sem derrubar a API 116ms
+ ✓ tests/integracao-pedidos.test.ts > rotas internas de integração > exigem chave de escrita para importar (403 com a de leitura) e 401 sem chave 46ms
+ ✓ tests/integracao-pedidos.test.ts > rotas internas de integração > listam pedidos importados e logs, com filtro por importação 108ms
+ ✓ tests/entregas.test.ts > health > responde 200 UP sem X-API-Key 88ms
+ ✓ tests/entregas.test.ts > autenticação e autorização > 401 sem chave, com formato de erro padrão e request_id 45ms
+ ✓ tests/entregas.test.ts > autenticação e autorização > 401 com chave inválida 49ms
+ ✓ tests/entregas.test.ts > autenticação e autorização > chave somente leitura: GET ok, POST/PUT/PATCH/DELETE retornam 403 142ms
+ ✓ tests/entregas.test.ts > autenticação e autorização > devolve o X-Request-Id enviado pelo consumidor 56ms
+ ✓ tests/entregas.test.ts > rotas inexistentes > 404 com formato padrão 62ms
+ ✓ tests/entregas.test.ts > POST /entregas > 201 com id, código de rastreio, status inicial, Location e histórico 91ms
+ ✓ tests/entregas.test.ts > POST /entregas > ignora status, id e campos desconhecidos enviados no corpo 75ms
+ ✓ tests/entregas.test.ts > POST /entregas > 400 com Content-Type diferente de JSON 59ms
+ ✓ tests/entregas.test.ts > POST /entregas > 400 com JSON malformado 50ms
+ ✓ tests/entregas.test.ts > POST /entregas > 400 com campos obrigatórios ausentes e tipos errados, listando cada campo 50ms
+ ✓ tests/entregas.test.ts > POST /entregas > 422 para data no passado e UF inexistente, com detalhes por campo 36ms
+ ✓ tests/entregas.test.ts > POST /entregas > 422: data fora do formato 33ms
+ ✓ tests/entregas.test.ts > POST /entregas > 422: frete negativo 34ms
+ ✓ tests/entregas.test.ts > POST /entregas > 422: frete com 3 casas decimais 30ms
+ ✓ tests/entregas.test.ts > POST /entregas > 422: frete acima do máximo 31ms
+ ✓ tests/entregas.test.ts > POST /entregas > 422: nome só com espaços 32ms
+ ✓ tests/entregas.test.ts > POST /entregas > 422: nome curto demais 32ms
+ ✓ tests/entregas.test.ts > POST /entregas > 422: id_pedido zero 32ms
+ ✓ tests/entregas.test.ts > POST /entregas > 422 para CEP fora do padrão e UF minúscula 31ms
+ ✓ tests/entregas.test.ts > POST /entregas > 409 ao cadastrar segunda entrega ativa para o mesmo pedido 37ms
+ ✓ tests/entregas.test.ts > POST /entregas > permite nova entrega para o pedido depois de cancelada a anterior 49ms
+ ✓ tests/entregas.test.ts > POST /entregas > apenas uma de duas requisições simultâneas cria a entrega (a outra recebe 409) 61ms
+ ✓ tests/entregas.test.ts > GET /entregas e /entregas/{id} > lista vazia retorna 200 com paginação zerada 47ms
+ ✓ tests/entregas.test.ts > GET /entregas e /entregas/{id} > filtra por id_pedido e status e pagina 66ms
+ ✓ tests/entregas.test.ts > GET /entregas e /entregas/{id} > 400 para query inválida: pagina=0 27ms
+ ✓ tests/entregas.test.ts > GET /entregas e /entregas/{id} > 400 para query inválida: tamanho=101 34ms
+ ✓ tests/entregas.test.ts > GET /entregas e /entregas/{id} > 400 para query inválida: tamanho=abc 39ms
+ ✓ tests/entregas.test.ts > GET /entregas e /entregas/{id} > 400 para query inválida: id_pedido=-1 31ms
+ ✓ tests/entregas.test.ts > GET /entregas e /entregas/{id} > 400 para query inválida: status_entrega=INEXISTENTE 39ms
+ ✓ tests/entregas.test.ts > GET /entregas e /entregas/{id} > consulta por id: 200, 404 e 400 48ms
+ ✓ tests/entregas.test.ts > PUT /entregas/{id} > 200 atualiza os campos editáveis e mantém o status 48ms
+ ✓ tests/entregas.test.ts > PUT /entregas/{id} > aceita id_pedido igual ao gravado e ignora campos somente leitura 45ms
+ ✓ tests/entregas.test.ts > PUT /entregas/{id} > 422 ao tentar alterar id_pedido, id_cliente ou status 50ms
+ ✓ tests/entregas.test.ts > PUT /entregas/{id} > 400 quando falta campo editável (substituição completa) 42ms
+ ✓ tests/entregas.test.ts > PUT /entregas/{id} > 404 para entrega inexistente 31ms
+ ✓ tests/entregas.test.ts > PUT /entregas/{id} > 409 quando o status não permite edição 58ms
+ ✓ tests/entregas.test.ts > PUT /entregas/{id} > data_prevista só é revalidada quando muda (entrega atrasada pode ser editada) 46ms
+ ✓ tests/entregas.test.ts > PATCH /entregas/{id}/status > percorre o fluxo completo até ENTREGUE e registra o histórico 127ms
+ ✓ tests/entregas.test.ts > PATCH /entregas/{id}/status > 409 em transição fora da tabela, no mesmo status e a partir de status final 185ms
+ ✓ tests/entregas.test.ts > PATCH /entregas/{id}/status > permite NAO_ENTREGUE -> SAIU_PARA_ENTREGA -> ENTREGUE e NAO_ENTREGUE -> DEVOLVIDA 174ms
+ ✓ tests/entregas.test.ts > PATCH /entregas/{id}/status > 422 para ENTREGUE sem data_entrega, com data futura, e data_entrega em outro status 158ms
+ ✓ tests/entregas.test.ts > PATCH /entregas/{id}/status > 422 para status fora do enum; 400 sem status ou com tipo errado; 404 inexistente 80ms
+ ✓ tests/entregas.test.ts > DELETE /entregas/{id} > 204 para entrega AGUARDANDO_COLETA e depois 404 88ms
+ ✓ tests/entregas.test.ts > DELETE /entregas/{id} > 409 depois de coletada (usar PATCH CANCELADA) 75ms
+ ✓ tests/entregas.test.ts > DELETE /entregas/{id} > 400 para id inválido 38ms
+ ✓ tests/entregas.test.ts > GET /entregas/{id}/historico > 400 para id inválido e 404 para inexistente 50ms
+
+ Test Files  2 passed (2)
+      Tests  76 passed (76)
+   Start at  12:01:19
+   Duration  10.92s (tests 81%, import 17%, transform 2%)
+

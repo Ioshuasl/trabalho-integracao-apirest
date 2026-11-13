@@ -1,0 +1,178 @@
+
+> entregas-api@1.0.0 test:postman
+> newman run docs/postman/entregas-g7.postman_collection.json -e docs/postman/entregas-g7-local.postman_environment.json --reporters cli --color off
+
+newman
+
+API de Entregas — Grupo 7
+
+□ 00 Saúde
+└ GET /health (sem chave)
+  GET http://localhost:5007/api/v1/health [200 OK, 278B, 161ms]
+  √  Status 200
+  √  status UP
+
+□ 01 Fluxo completo
+└ POST /entregas — cadastrar
+  POST http://localhost:5007/api/v1/entregas [201 Created, 842B, 106ms]
+  √  Status 201
+  √  código de rastreio e status inicial
+  √  Location aponta para o recurso
+  √  X-Request-Id devolvido
+
+└ GET /entregas?id_pedido — listar
+  GET http://localhost:5007/api/v1/entregas?id_pedido=970214 [200 OK, 895B, 21ms]
+  √  Status 200
+  √  uma entrega e paginação
+
+└ GET /entregas/{id} — consultar
+  GET http://localhost:5007/api/v1/entregas/1 [200 OK, 807B, 10ms]
+  √  Status 200
+  √  mesmo id
+
+└ PUT /entregas/{id} — atualizar cadastro
+  PUT http://localhost:5007/api/v1/entregas/1 [200 OK, 812B, 19ms]
+  √  Status 200
+  √  dados atualizados
+
+└ PATCH /status — EM_TRANSITO
+  PATCH http://localhost:5007/api/v1/entregas/1/status [200 OK, 806B, 22ms]
+  √  Status 200
+  √  novo status
+
+└ PATCH /status — SAIU_PARA_ENTREGA
+  PATCH http://localhost:5007/api/v1/entregas/1/status [200 OK, 812B, 21ms]
+  √  Status 200
+
+└ PATCH /status — ENTREGUE
+  PATCH http://localhost:5007/api/v1/entregas/1/status [200 OK, 811B, 19ms]
+  √  Status 200
+  √  entregue com data
+
+└ GET /entregas/{id}/historico
+  GET http://localhost:5007/api/v1/entregas/1/historico [200 OK, 689B, 16ms]
+  √  Status 200
+  √  4 mudanças em ordem
+
+└ GET /entregas — paginação
+  GET http://localhost:5007/api/v1/entregas?pagina=1&tamanho=5 [200 OK, 898B, 10ms]
+  √  Status 200
+  √  respeita o tamanho
+
+□ 02 Exclusão
+└ POST /entregas — cadastrar para excluir
+  POST http://localhost:5007/api/v1/entregas [201 Created, 843B, 15ms]
+  √  Status 201
+
+└ DELETE /entregas/{id} — 204
+  DELETE http://localhost:5007/api/v1/entregas/2 [204 No Content, 163B, 17ms]
+  √  Status 204
+  √  sem corpo
+
+└ GET /entregas/{id} — 404 após exclusão
+  GET http://localhost:5007/api/v1/entregas/2 [404 Not Found, 498B, 8ms]
+  √  Status 404
+  √  erro.codigo = NAO_ENCONTRADO
+
+□ 03 Cenários de erro
+└ 401 — sem X-API-Key
+  GET http://localhost:5007/api/v1/entregas [401 Unauthorized, 505B, 6ms]
+  √  Status 401
+  √  erro.codigo = NAO_AUTENTICADO
+
+└ 403 — chave somente leitura (G2) em POST
+  POST http://localhost:5007/api/v1/entregas [403 Forbidden, 529B, 6ms]
+  √  Status 403
+  √  erro.codigo = SEM_PERMISSAO
+
+└ 400 — JSON malformado
+  POST http://localhost:5007/api/v1/entregas [400 Bad Request, 551B, 8ms]
+  √  Status 400
+  √  erro.codigo = REQUISICAO_INVALIDA
+  √  detalhes presentes
+
+└ 400 — campo obrigatório ausente e tipo errado
+  POST http://localhost:5007/api/v1/entregas [400 Bad Request, 631B, 9ms]
+  √  Status 400
+  √  erro.codigo = REQUISICAO_INVALIDA
+  √  lista cada campo
+
+└ 400 — id inválido
+  GET http://localhost:5007/api/v1/entregas/abc [400 Bad Request, 574B, 4ms]
+  √  Status 400
+  √  erro.codigo = REQUISICAO_INVALIDA
+
+└ 422 — data no passado e UF inexistente
+  POST http://localhost:5007/api/v1/entregas [422 Unprocessable Entity, 668B, 11ms]
+  √  Status 422
+  √  erro.codigo = VALIDACAO_SEMANTICA
+  √  detalha os dois campos
+
+└ 409 — entrega ativa duplicada para o pedido
+  POST http://localhost:5007/api/v1/entregas [409 Conflict, 522B, 10ms]
+  √  Status 409
+  √  erro.codigo = ENTREGA_DUPLICADA
+
+└ 409 — transição de status inválida
+  PATCH http://localhost:5007/api/v1/entregas/1/status [409 Conflict, 545B, 10ms]
+  √  Status 409
+  √  erro.codigo = TRANSICAO_INVALIDA
+
+└ 409 — PUT em entrega que não permite edição
+  PUT http://localhost:5007/api/v1/entregas/1 [409 Conflict, 574B, 9ms]
+  √  Status 409
+  √  erro.codigo = OPERACAO_NAO_PERMITIDA
+
+└ 409 — DELETE em entrega já coletada
+  DELETE http://localhost:5007/api/v1/entregas/1 [409 Conflict, 585B, 8ms]
+  √  Status 409
+  √  erro.codigo = OPERACAO_NAO_PERMITIDA
+
+└ 404 — entrega inexistente
+  GET http://localhost:5007/api/v1/entregas/99999999 [404 Not Found, 512B, 7ms]
+  √  Status 404
+  √  erro.codigo = NAO_ENCONTRADO
+
+└ 404 — rota inexistente
+  GET http://localhost:5007/api/v1/inexistente [404 Not Found, 490B, 4ms]
+  √  Status 404
+  √  erro.codigo = NAO_ENCONTRADO
+
+□ 04 Integração G5 (interno)
+└ POST /integracoes/pedidos/importar
+  POST http://localhost:5007/api/v1/integracoes/pedidos/importar [200 OK, 1.82kB, 195ms]
+  √  200 (resumo) ou erro de integração documentado
+  √  resumo completo
+
+└ GET /integracoes/pedidos — pedidos importados
+  GET http://localhost:5007/api/v1/integracoes/pedidos [200 OK, 3.92kB, 8ms]
+  √  Status 200
+
+└ GET /integracoes/logs — ocorrências
+  GET http://localhost:5007/api/v1/integracoes/logs?limite=20 [200 OK, 1.06kB, 13ms]
+  √  Status 200
+
+└ POST /integracoes/pedidos/importar — 403 com chave de leitura
+  POST http://localhost:5007/api/v1/integracoes/pedidos/importar [403 Forbidden, 549B, 5ms]
+  √  Status 403
+  √  erro.codigo = SEM_PERMISSAO
+
+┌─────────────────────────┬───────────────────┬──────────────────┐
+│                         │          executed │           failed │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              iterations │                 1 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│                requests │                29 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│            test-scripts │                29 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│      prerequest-scripts │                29 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              assertions │                59 │                0 │
+├─────────────────────────┴───────────────────┴──────────────────┤
+│ total run duration: 3.3s                                       │
+├────────────────────────────────────────────────────────────────┤
+│ total data received: 15.39kB (approx)                          │
+├────────────────────────────────────────────────────────────────┤
+│ average response time: 26ms [min: 4ms, max: 195ms, s.d.: 45ms] │
+└────────────────────────────────────────────────────────────────┘

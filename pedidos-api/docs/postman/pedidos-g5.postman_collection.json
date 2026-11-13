@@ -1,0 +1,1524 @@
+{
+  "info": {
+    "name": "API de Pedidos — Grupo 5",
+    "description": "Coleção do contrato v1.0. Pré-requisito: `npm run seed` (clientes 1-7, pedidos 101-108). Rode as pastas na ordem (Collection Runner). Variáveis: baseUrl, apiKey (admin), apiKeyG7 (somente /integracao).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5005/api/v1"
+    },
+    {
+      "key": "apiKey",
+      "value": "g5-pedidos-admin-2026"
+    },
+    {
+      "key": "apiKeyG7",
+      "value": "g7-entregas-leitura-2026"
+    },
+    {
+      "key": "idPedido",
+      "value": ""
+    },
+    {
+      "key": "idPedidoExclusao",
+      "value": ""
+    },
+    {
+      "key": "idCliente",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Saúde",
+      "item": [
+        {
+          "name": "GET /health (sem chave)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 Integração (consumida pelo G7)",
+      "description": "O G7 só enxerga esta estrutura (Contrato B): pedidos CONFIRMADO ou CANCELADO, sem itens.",
+      "item": [
+        {
+          "name": "GET /integracao/pedidos — chave do G7",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyG7}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracao/pedidos?tamanho=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('só CONFIRMADO/CANCELADO e sem itens', () => { const j = pm.response.json(); pm.expect(j.dados.length).to.be.above(0); j.dados.forEach(p => { pm.expect(['CONFIRMADO', 'CANCELADO']).to.include(p.status_pedido); pm.expect(p).to.not.have.property('itens'); }); });",
+                  "pm.test('campos do Contrato B', () => pm.expect(pm.response.json().dados[0]).to.have.all.keys('codigo_pedido', 'codigo_cliente', 'nome_cliente', 'endereco_entrega', 'cidade_entrega', 'uf_entrega', 'cep_entrega', 'data_pedido', 'quantidade_itens', 'valor_total', 'status_pedido', 'data_atualizacao'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /integracao/pedidos — paginação",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyG7}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracao/pedidos?pagina=1&tamanho=2"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('2 por página', () => { const j = pm.response.json(); pm.expect(j.dados).to.have.length(2); pm.expect(j.paginacao.tamanho).to.eql(2); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 — chave do G7 fora de /integracao",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyG7}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('erro.codigo = SEM_PERMISSAO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('SEM_PERMISSAO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 — paginação inválida",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyG7}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracao/pedidos?tamanho=500"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('erro.codigo = REQUISICAO_INVALIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('REQUISICAO_INVALIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Clientes",
+      "item": [
+        {
+          "name": "POST /clientes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cliente Postman\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/clientes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('idCliente', String(pm.response.json().codigo_cliente));",
+                  "pm.test('ativo', () => pm.expect(pm.response.json().ativo).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /clientes/{id}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/clientes/{{idCliente}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /clientes/{id}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cliente Postman Renomeado\",\n  \"ativo\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/clientes/{{idCliente}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('renomeado', () => pm.expect(pm.response.json().nome).to.eql('Cliente Postman Renomeado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /clientes — lista",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/clientes?tamanho=5"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /clientes/{id} — desativa",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/clientes/{{idCliente}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /clientes/{id} — continua existindo, inativo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/clientes/{{idCliente}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('inativo', () => pm.expect(pm.response.json().ativo).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /clientes/1 — 409 (tem pedidos)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/clientes/1"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('erro.codigo = OPERACAO_NAO_PERMITIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('OPERACAO_NAO_PERMITIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Fluxo do pedido",
+      "description": "Execute na ordem: cada passo usa o código guardado pela criação.",
+      "item": [
+        {
+          "name": "POST /pedidos — criar (ABERTO)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_cliente\": 2,\n  \"endereco_entrega\": \"Av. Brasil, 1200, Centro\",\n  \"cidade_entrega\": \"Anápolis\",\n  \"uf_entrega\": \"GO\",\n  \"cep_entrega\": \"75024050\",\n  \"itens\": [\n    {\n      \"descricao\": \"Caneca térmica\",\n      \"quantidade\": 2,\n      \"preco_unitario\": 89.9\n    },\n    {\n      \"descricao\": \"Livro\",\n      \"quantidade\": 1,\n      \"preco_unitario\": 59.9\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const p = pm.response.json();",
+                  "pm.test('ABERTO, total e itens', () => { pm.expect(p.status_pedido).to.eql('ABERTO'); pm.expect(p.valor_total).to.eql(239.7); pm.expect(p.itens).to.have.length(2); pm.expect(p.quantidade_itens).to.eql(3); });",
+                  "pm.test('Location', () => pm.expect(pm.response.headers.get('Location')).to.eql('/api/v1/pedidos/' + p.codigo_pedido));",
+                  "pm.collectionVariables.set('idPedido', String(p.codigo_pedido));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /integracao/pedidos — pedido ABERTO ainda não aparece",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyG7}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracao/pedidos?tamanho=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ausente', () => pm.expect(pm.response.json().dados.map(p => String(p.codigo_pedido))).to.not.include(pm.collectionVariables.get('idPedido')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /pedidos/{id} — novo endereço e itens (ABERTO)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endereco_entrega\": \"Rua Nova, 99, Jardim Luz\",\n  \"cidade_entrega\": \"Goiânia\",\n  \"uf_entrega\": \"GO\",\n  \"cep_entrega\": \"74120020\",\n  \"itens\": [\n    {\n      \"descricao\": \"Mochila\",\n      \"quantidade\": 1,\n      \"preco_unitario\": 145\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos/{{idPedido}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('total recalculado', () => { const p = pm.response.json(); pm.expect(p.valor_total).to.eql(145); pm.expect(p.cidade_entrega).to.eql('Goiânia'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /pedidos/{id}/status — CONFIRMADO",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_pedido\": \"CONFIRMADO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos/{{idPedido}}/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('confirmado', () => pm.expect(pm.response.json().status_pedido).to.eql('CONFIRMADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /integracao/pedidos — pedido confirmado aparece",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyG7}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracao/pedidos?tamanho=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('presente como CONFIRMADO', () => { const p = pm.response.json().dados.find(x => String(x.codigo_pedido) === pm.collectionVariables.get('idPedido')); pm.expect(p).to.be.an('object'); pm.expect(p.status_pedido).to.eql('CONFIRMADO'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /pedidos/{id} — muda endereço de pedido CONFIRMADO",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endereco_entrega\": \"Rua Nova, 99, Jardim Luz\",\n  \"cidade_entrega\": \"Senador Canedo\",\n  \"uf_entrega\": \"GO\",\n  \"cep_entrega\": \"75250000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos/{{idPedido}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('endereço novo', () => pm.expect(pm.response.json().cidade_entrega).to.eql('Senador Canedo'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pedidos/{id} — consulta com itens",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos/{{idPedido}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('itens', () => pm.expect(pm.response.json().itens).to.have.length(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /pedidos/{id}/status — CANCELADO",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_pedido\": \"CANCELADO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos/{{idPedido}}/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('cancelado', () => pm.expect(pm.response.json().status_pedido).to.eql('CANCELADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /integracao/pedidos — cancelado continua na view",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyG7}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracao/pedidos?tamanho=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('CANCELADO visível', () => { const p = pm.response.json().dados.find(x => String(x.codigo_pedido) === pm.collectionVariables.get('idPedido')); pm.expect(p.status_pedido).to.eql('CANCELADO'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pedidos — filtros",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos?status_pedido=CANCELADO&tamanho=5"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Exclusão de pedido ABERTO",
+      "item": [
+        {
+          "name": "POST /pedidos — criar para excluir",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_cliente\": 3,\n  \"endereco_entrega\": \"Av. Brasil, 1200, Centro\",\n  \"cidade_entrega\": \"Anápolis\",\n  \"uf_entrega\": \"GO\",\n  \"cep_entrega\": \"75024050\",\n  \"itens\": [\n    {\n      \"descricao\": \"Caneca térmica\",\n      \"quantidade\": 2,\n      \"preco_unitario\": 89.9\n    },\n    {\n      \"descricao\": \"Livro\",\n      \"quantidade\": 1,\n      \"preco_unitario\": 59.9\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('idPedidoExclusao', String(pm.response.json().codigo_pedido));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /pedidos/{id} — 204",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos/{{idPedidoExclusao}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pedidos/{id} — 404 depois de excluir",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos/{{idPedidoExclusao}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('erro.codigo = NAO_ENCONTRADO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('NAO_ENCONTRADO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Cenários de erro",
+      "description": "Cada requisição provoca um erro do contrato. Rode depois da pasta 03.",
+      "item": [
+        {
+          "name": "401 — sem X-API-Key",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('erro.codigo = NAO_AUTENTICADO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('NAO_AUTENTICADO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 — JSON malformado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"codigo_cliente\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('erro.codigo = REQUISICAO_INVALIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('REQUISICAO_INVALIDA'); pm.expect(j.request_id).to.be.a('string'); });",
+                  "pm.test('detalhes', () => pm.expect(pm.response.json().erro.detalhes).to.have.length.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 — campo ausente e tipo errado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_cliente\": 2,\n  \"endereco_entrega\": \"Rua X\",\n  \"uf_entrega\": \"GO\",\n  \"cep_entrega\": \"74120020\",\n  \"itens\": [\n    {\n      \"descricao\": \"x\",\n      \"quantidade\": \"2\",\n      \"preco_unitario\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('lista os campos', () => pm.expect(pm.response.json().erro.detalhes.map(d => d.campo)).to.include.members(['cidade_entrega', 'itens.0.quantidade']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 — UF inexistente e CEP inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_cliente\": 2,\n  \"endereco_entrega\": \"Av. Brasil, 1200, Centro\",\n  \"cidade_entrega\": \"Anápolis\",\n  \"uf_entrega\": \"XX\",\n  \"cep_entrega\": \"1234\",\n  \"itens\": [\n    {\n      \"descricao\": \"Caneca térmica\",\n      \"quantidade\": 2,\n      \"preco_unitario\": 89.9\n    },\n    {\n      \"descricao\": \"Livro\",\n      \"quantidade\": 1,\n      \"preco_unitario\": 59.9\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('erro.codigo = VALIDACAO_SEMANTICA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('VALIDACAO_SEMANTICA'); pm.expect(j.request_id).to.be.a('string'); });",
+                  "pm.test('detalha os dois campos', () => pm.expect(pm.response.json().erro.detalhes.map(d => d.campo)).to.include.members(['uf_entrega', 'cep_entrega']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 — pedido sem itens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_cliente\": 2,\n  \"endereco_entrega\": \"Av. Brasil, 1200, Centro\",\n  \"cidade_entrega\": \"Anápolis\",\n  \"uf_entrega\": \"GO\",\n  \"cep_entrega\": \"75024050\",\n  \"itens\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('erro.codigo = VALIDACAO_SEMANTICA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('VALIDACAO_SEMANTICA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 — cliente inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_cliente\": 99999,\n  \"endereco_entrega\": \"Av. Brasil, 1200, Centro\",\n  \"cidade_entrega\": \"Anápolis\",\n  \"uf_entrega\": \"GO\",\n  \"cep_entrega\": \"75024050\",\n  \"itens\": [\n    {\n      \"descricao\": \"Caneca térmica\",\n      \"quantidade\": 2,\n      \"preco_unitario\": 89.9\n    },\n    {\n      \"descricao\": \"Livro\",\n      \"quantidade\": 1,\n      \"preco_unitario\": 59.9\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('erro.codigo = VALIDACAO_SEMANTICA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('VALIDACAO_SEMANTICA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 — transição inválida (CANCELADO é final)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_pedido\": \"CONFIRMADO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos/{{idPedido}}/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('erro.codigo = TRANSICAO_INVALIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('TRANSICAO_INVALIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 — PUT em pedido CANCELADO",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endereco_entrega\": \"Rua Nova, 99, Jardim Luz\",\n  \"cidade_entrega\": \"Goiânia\",\n  \"uf_entrega\": \"GO\",\n  \"cep_entrega\": \"74120020\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos/{{idPedido}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('erro.codigo = OPERACAO_NAO_PERMITIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('OPERACAO_NAO_PERMITIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 — DELETE em pedido que não está ABERTO",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos/101"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('erro.codigo = OPERACAO_NAO_PERMITIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('OPERACAO_NAO_PERMITIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 — status fora do enum",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_pedido\": \"VOANDO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/pedidos/101/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('erro.codigo = VALIDACAO_SEMANTICA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('VALIDACAO_SEMANTICA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 — pedido inexistente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos/99999999"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('erro.codigo = NAO_ENCONTRADO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('NAO_ENCONTRADO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 — código inválido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/pedidos/abc"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('erro.codigo = REQUISICAO_INVALIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('REQUISICAO_INVALIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 — rota inexistente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/inexistente"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('erro.codigo = NAO_ENCONTRADO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('NAO_ENCONTRADO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

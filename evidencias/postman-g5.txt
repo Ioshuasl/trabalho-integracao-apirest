@@ -1,0 +1,221 @@
+
+> pedidos-api@1.0.0 test:postman
+> newman run docs/postman/pedidos-g5.postman_collection.json -e docs/postman/pedidos-g5-local.postman_environment.json --reporters cli --color off
+
+newman
+
+API de Pedidos — Grupo 5
+
+□ 00 Saúde
+└ GET /health (sem chave)
+  GET http://localhost:5005/api/v1/health [200 OK, 278B, 126ms]
+  √  Status 200
+  √  UP
+
+□ 01 Integração (consumida pelo G7)
+└ GET /integracao/pedidos — chave do G7
+  GET http://localhost:5005/api/v1/integracao/pedidos?tamanho=100 [200 OK, 2.88kB, 44ms]
+  √  Status 200
+  √  só CONFIRMADO/CANCELADO e sem itens
+  √  campos do Contrato B
+
+└ GET /integracao/pedidos — paginação
+  GET http://localhost:5005/api/v1/integracao/pedidos?pagina=1&tamanho=2 [200 OK, 1.06kB, 17ms]
+  √  Status 200
+  √  2 por página
+
+└ 403 — chave do G7 fora de /integracao
+  GET http://localhost:5005/api/v1/pedidos [403 Forbidden, 527B, 7ms]
+  √  Status 403
+  √  erro.codigo = SEM_PERMISSAO
+
+└ 400 — paginação inválida
+  GET http://localhost:5005/api/v1/integracao/pedidos?tamanho=500 [400 Bad Request, 591B, 11ms]
+  √  Status 400
+  √  erro.codigo = REQUISICAO_INVALIDA
+
+□ 02 Clientes
+└ POST /clientes
+  POST http://localhost:5005/api/v1/clientes [201 Created, 357B, 85ms]
+  √  Status 201
+  √  ativo
+
+└ GET /clientes/{id}
+  GET http://localhost:5005/api/v1/clientes/8 [200 OK, 322B, 7ms]
+  √  Status 200
+
+└ PUT /clientes/{id}
+  PUT http://localhost:5005/api/v1/clientes/8 [200 OK, 332B, 14ms]
+  √  Status 200
+  √  renomeado
+
+└ GET /clientes — lista
+  GET http://localhost:5005/api/v1/clientes?tamanho=5 [200 OK, 629B, 12ms]
+  √  Status 200
+
+└ DELETE /clientes/{id} — desativa
+  DELETE http://localhost:5005/api/v1/clientes/8 [204 No Content, 163B, 21ms]
+  √  Status 204
+
+└ GET /clientes/{id} — continua existindo, inativo
+  GET http://localhost:5005/api/v1/clientes/8 [200 OK, 333B, 7ms]
+  √  Status 200
+  √  inativo
+
+└ DELETE /clientes/1 — 409 (tem pedidos)
+  DELETE http://localhost:5005/api/v1/clientes/1 [409 Conflict, 550B, 20ms]
+  √  Status 409
+  √  erro.codigo = OPERACAO_NAO_PERMITIDA
+
+□ 03 Fluxo do pedido
+└ POST /pedidos — criar (ABERTO)
+  POST http://localhost:5005/api/v1/pedidos [201 Created, 816B, 26ms]
+  √  Status 201
+  √  ABERTO, total e itens
+  √  Location
+
+└ GET /integracao/pedidos — pedido ABERTO ainda não aparece
+  GET http://localhost:5005/api/v1/integracao/pedidos?tamanho=100 [200 OK, 2.88kB, 11ms]
+  √  Status 200
+  √  ausente
+
+└ PUT /pedidos/{id} — novo endereço e itens (ABERTO)
+  PUT http://localhost:5005/api/v1/pedidos/109 [200 OK, 696B, 62ms]
+  √  Status 200
+  √  total recalculado
+
+└ PATCH /pedidos/{id}/status — CONFIRMADO
+  PATCH http://localhost:5005/api/v1/pedidos/109/status [200 OK, 700B, 19ms]
+  √  Status 200
+  √  confirmado
+
+└ GET /integracao/pedidos — pedido confirmado aparece
+  GET http://localhost:5005/api/v1/integracao/pedidos?tamanho=100 [200 OK, 3.23kB, 8ms]
+  √  Status 200
+  √  presente como CONFIRMADO
+
+└ PUT /pedidos/{id} — muda endereço de pedido CONFIRMADO
+  PUT http://localhost:5005/api/v1/pedidos/109 [200 OK, 706B, 15ms]
+  √  Status 200
+  √  endereço novo
+
+└ GET /pedidos/{id} — consulta com itens
+  GET http://localhost:5005/api/v1/pedidos/109 [200 OK, 706B, 6ms]
+  √  Status 200
+  √  itens
+
+└ PATCH /pedidos/{id}/status — CANCELADO
+  PATCH http://localhost:5005/api/v1/pedidos/109/status [200 OK, 705B, 12ms]
+  √  Status 200
+  √  cancelado
+
+└ GET /integracao/pedidos — cancelado continua na view
+  GET http://localhost:5005/api/v1/integracao/pedidos?tamanho=100 [200 OK, 3.24kB, 13ms]
+  √  Status 200
+  √  CANCELADO visível
+
+└ GET /pedidos — filtros
+  GET http://localhost:5005/api/v1/pedidos?status_pedido=CANCELADO&tamanho=5 [200 OK, 709B, 11ms]
+  √  Status 200
+
+□ 04 Exclusão de pedido ABERTO
+└ POST /pedidos — criar para excluir
+  POST http://localhost:5005/api/v1/pedidos [201 Created, 816B, 29ms]
+  √  Status 201
+
+└ DELETE /pedidos/{id} — 204
+  DELETE http://localhost:5005/api/v1/pedidos/110 [204 No Content, 163B, 14ms]
+  √  Status 204
+
+└ GET /pedidos/{id} — 404 depois de excluir
+  GET http://localhost:5005/api/v1/pedidos/110 [404 Not Found, 500B, 7ms]
+  √  Status 404
+  √  erro.codigo = NAO_ENCONTRADO
+
+□ 05 Cenários de erro
+└ 401 — sem X-API-Key
+  GET http://localhost:5005/api/v1/pedidos [401 Unauthorized, 504B, 5ms]
+  √  Status 401
+  √  erro.codigo = NAO_AUTENTICADO
+
+└ 400 — JSON malformado
+  POST http://localhost:5005/api/v1/pedidos [400 Bad Request, 550B, 7ms]
+  √  Status 400
+  √  erro.codigo = REQUISICAO_INVALIDA
+  √  detalhes
+
+└ 400 — campo ausente e tipo errado
+  POST http://localhost:5005/api/v1/pedidos [400 Bad Request, 641B, 8ms]
+  √  Status 400
+  √  lista os campos
+
+└ 422 — UF inexistente e CEP inválido
+  POST http://localhost:5005/api/v1/pedidos [422 Unprocessable Entity, 658B, 12ms]
+  √  Status 422
+  √  erro.codigo = VALIDACAO_SEMANTICA
+  √  detalha os dois campos
+
+└ 422 — pedido sem itens
+  POST http://localhost:5005/api/v1/pedidos [422 Unprocessable Entity, 583B, 9ms]
+  √  Status 422
+  √  erro.codigo = VALIDACAO_SEMANTICA
+
+└ 422 — cliente inexistente
+  POST http://localhost:5005/api/v1/pedidos [422 Unprocessable Entity, 598B, 9ms]
+  √  Status 422
+  √  erro.codigo = VALIDACAO_SEMANTICA
+
+└ 409 — transição inválida (CANCELADO é final)
+  PATCH http://localhost:5005/api/v1/pedidos/109/status [409 Conflict, 546B, 7ms]
+  √  Status 409
+  √  erro.codigo = TRANSICAO_INVALIDA
+
+└ 409 — PUT em pedido CANCELADO
+  PUT http://localhost:5005/api/v1/pedidos/109 [409 Conflict, 520B, 13ms]
+  √  Status 409
+  √  erro.codigo = OPERACAO_NAO_PERMITIDA
+
+└ 409 — DELETE em pedido que não está ABERTO
+  DELETE http://localhost:5005/api/v1/pedidos/101 [409 Conflict, 565B, 5ms]
+  √  Status 409
+  √  erro.codigo = OPERACAO_NAO_PERMITIDA
+
+└ 422 — status fora do enum
+  PATCH http://localhost:5005/api/v1/pedidos/101/status [422 Unprocessable Entity, 615B, 8ms]
+  √  Status 422
+  √  erro.codigo = VALIDACAO_SEMANTICA
+
+└ 404 — pedido inexistente
+  GET http://localhost:5005/api/v1/pedidos/99999999 [404 Not Found, 510B, 9ms]
+  √  Status 404
+  √  erro.codigo = NAO_ENCONTRADO
+
+└ 400 — código inválido
+  GET http://localhost:5005/api/v1/pedidos/abc [400 Bad Request, 576B, 5ms]
+  √  Status 400
+  √  erro.codigo = REQUISICAO_INVALIDA
+
+└ 404 — rota inexistente
+  GET http://localhost:5005/api/v1/inexistente [404 Not Found, 490B, 5ms]
+  √  Status 404
+  √  erro.codigo = NAO_ENCONTRADO
+
+┌─────────────────────────┬───────────────────┬──────────────────┐
+│                         │          executed │           failed │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              iterations │                 1 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│                requests │                38 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│            test-scripts │                38 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│      prerequest-scripts │                 0 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              assertions │                74 │                0 │
+├─────────────────────────┴───────────────────┴──────────────────┤
+│ total run duration: 4s                                         │
+├────────────────────────────────────────────────────────────────┤
+│ total data received: 21.09kB (approx)                          │
+├────────────────────────────────────────────────────────────────┤
+│ average response time: 18ms [min: 5ms, max: 126ms, s.d.: 23ms] │
+└────────────────────────────────────────────────────────────────┘

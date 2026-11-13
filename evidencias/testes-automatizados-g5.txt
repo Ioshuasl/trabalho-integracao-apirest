@@ -1,0 +1,42 @@
+
+ RUN  v5.1.0 C:/Users/ioshu/faculdade/integracao-aplicacao-api-rest/pedidos-api
+
+ ✓ tests/pedidos.test.ts > health, autenticação e perfis > health responde 200 sem chave 51ms
+ ✓ tests/pedidos.test.ts > health, autenticação e perfis > 401 sem chave ou com chave inválida, com formato de erro padrão 14ms
+ ✓ tests/pedidos.test.ts > health, autenticação e perfis > chave do G7 acessa só /integracao (GET); /pedidos, /clientes e escrita retornam 403 28ms
+ ✓ tests/pedidos.test.ts > health, autenticação e perfis > rota inexistente: 404 com formato padrão 8ms
+ ✓ tests/pedidos.test.ts > endpoint de integração (Contrato B) > só CONFIRMADO/CANCELADO, com os campos exatos da view e sem itens 10ms
+ ✓ tests/pedidos.test.ts > endpoint de integração (Contrato B) > pedido cancelado continua na view (nunca some) e pedido novo confirmado aparece 57ms
+ ✓ tests/pedidos.test.ts > endpoint de integração (Contrato B) > pagina e valida parâmetros 14ms
+ ✓ tests/pedidos.test.ts > endpoint de integração (Contrato B) > data_atualizacao muda a cada alteração do pedido 23ms
+ ✓ tests/pedidos.test.ts > clientes > CRUD: cria, consulta, atualiza, lista e desativa (sem apagar) 35ms
+ ✓ tests/pedidos.test.ts > clientes > cliente com pedido ABERTO ou CONFIRMADO não é desativado (409) 15ms
+ ✓ tests/pedidos.test.ts > clientes > 400 estrutura, 422 valor, 404 inexistente 14ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 201 cria pedido ABERTO com total calculado e itens 11ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 400: JSON malformado, Content-Type errado, campos ausentes e tipos errados 13ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: UF inexistente 8ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: UF minúscula 7ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: CEP com 4 dígitos 7ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: CEP com traço 8ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: endereço vazio 7ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: endereço maior que 200 7ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: sem itens 7ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: quantidade zero 7ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: preço negativo 7ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: preço com 3 casas 8ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422: cliente inexistente 7ms
+ ✓ tests/pedidos.test.ts > POST /pedidos > 422 para cliente inativo 9ms
+ ✓ tests/pedidos.test.ts > consultas de pedidos > lista com filtros e paginação; lista não traz itens 24ms
+ ✓ tests/pedidos.test.ts > consultas de pedidos > consulta por código traz itens; 404 e 400 16ms
+ ✓ tests/pedidos.test.ts > PUT /pedidos/{id} > altera o endereço de pedido CONFIRMADO, mas não os itens (409) 16ms
+ ✓ tests/pedidos.test.ts > PUT /pedidos/{id} > pedido ABERTO: substitui itens e recalcula o total 11ms
+ ✓ tests/pedidos.test.ts > PUT /pedidos/{id} > 409 em pedido CANCELADO; 404; 400 sem endereço; 422 para troca de cliente 28ms
+ ✓ tests/pedidos.test.ts > PATCH /pedidos/{id}/status e DELETE > ABERTO -> CONFIRMADO -> CANCELADO; CANCELADO é final 29ms
+ ✓ tests/pedidos.test.ts > PATCH /pedidos/{id}/status e DELETE > 409 para voltar a ABERTO ou repetir status; 422 para valor fora do enum; 400/404 21ms
+ ✓ tests/pedidos.test.ts > PATCH /pedidos/{id}/status e DELETE > DELETE só em pedido ABERTO: 204 e depois 404; CONFIRMADO retorna 409 18ms
+
+ Test Files  1 passed (1)
+      Tests  33 passed (33)
+   Start at  12:01:15
+   Duration  1.44s (tests 48%, import 44%, transform 8%, worker 1%)
+

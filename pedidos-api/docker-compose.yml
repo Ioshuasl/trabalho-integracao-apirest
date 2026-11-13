@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pedidos-db
+    environment:
+      POSTGRES_USER: pedidos
+      POSTGRES_PASSWORD: pedidos
+      POSTGRES_DB: pedidos
+    ports:
+      - "5435:5432"
+    volumes:
+      - pedidos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pedidos -d pedidos"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pedidos_pgdata:

@@ -1,0 +1,1209 @@
+{
+  "info": {
+    "name": "API de Entregas — Grupo 7",
+    "description": "Coleção do contrato de integração v1.0. Rode a pasta \"01 Fluxo completo\" na ordem (Collection Runner) e depois as demais. Variáveis: baseUrl, apiKey, apiKeyLeitura (ver o ambiente \"Entregas G7 — local\").",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Datas e ids gerados a cada execução para os testes não colidirem entre si",
+          "// A API usa America/Sao_Paulo para definir \"hoje\"; calcular em UTC erraria o dia à noite",
+          "const dia = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }); };",
+          "pm.collectionVariables.set('dataPrevista', dia(7));",
+          "pm.collectionVariables.set('hoje', dia(0));",
+          "if (!pm.collectionVariables.get('idPedido')) pm.collectionVariables.set('idPedido', String(Math.floor(Math.random() * 900000) + 100000));",
+          "if (!pm.collectionVariables.get('idPedidoExclusao')) pm.collectionVariables.set('idPedidoExclusao', String(Math.floor(Math.random() * 900000) + 1000000));"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5007/api/v1"
+    },
+    {
+      "key": "apiKey",
+      "value": "g7-entregas-admin-2026"
+    },
+    {
+      "key": "apiKeyLeitura",
+      "value": "g2-vendas-leitura-2026"
+    },
+    {
+      "key": "idEntrega",
+      "value": ""
+    },
+    {
+      "key": "idEntregaExclusao",
+      "value": ""
+    },
+    {
+      "key": "idPedido",
+      "value": ""
+    },
+    {
+      "key": "idPedidoExclusao",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Saúde",
+      "item": [
+        {
+          "name": "GET /health (sem chave)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{baseUrl}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('status UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 Fluxo completo",
+      "description": "Execute na ordem: cada passo usa o id guardado pelo cadastro.",
+      "item": [
+        {
+          "name": "POST /entregas — cadastrar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": {{idPedido}},\n  \"id_cliente\": 1034,\n  \"nome_destinatario\": \"Maria Souza\",\n  \"transportadora\": \"Correios\",\n  \"endereco_destino\": {\n      \"logradouro\": \"Rua das Flores\",\n      \"numero\": \"120\",\n      \"complemento\": \"Apto 32\",\n      \"bairro\": \"Centro\",\n      \"cidade\": \"Campinas\",\n      \"uf\": \"SP\",\n      \"cep\": \"13010-100\"\n  },\n  \"data_prevista\": \"{{dataPrevista}}\",\n  \"valor_frete\": 25.90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const e = pm.response.json();",
+                  "pm.test('código de rastreio e status inicial', () => { pm.expect(e.codigo_rastreio).to.match(/^ENT-\\d{4}-\\d{6}$/); pm.expect(e.status_entrega).to.eql('AGUARDANDO_COLETA'); });",
+                  "pm.test('Location aponta para o recurso', () => pm.expect(pm.response.headers.get('Location')).to.eql('/api/v1/entregas/' + e.id_entrega));",
+                  "pm.test('X-Request-Id devolvido', () => pm.expect(pm.response.headers.get('X-Request-Id')).to.be.a('string'));",
+                  "pm.collectionVariables.set('idEntrega', String(e.id_entrega));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /entregas?id_pedido — listar",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas?id_pedido={{idPedido}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('uma entrega e paginação', () => { const j = pm.response.json(); pm.expect(j.dados).to.have.length(1); pm.expect(j.paginacao.total_registros).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /entregas/{id} — consultar",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas/{{idEntrega}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('mesmo id', () => pm.expect(String(pm.response.json().id_entrega)).to.eql(pm.collectionVariables.get('idEntrega')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /entregas/{id} — atualizar cadastro",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome_destinatario\": \"Maria Souza Lima\",\n  \"transportadora\": \"Correios\",\n  \"endereco_destino\": {\n      \"logradouro\": \"Rua das Flores\",\n      \"numero\": \"120\",\n      \"complemento\": \"Apto 33\",\n      \"bairro\": \"Centro\",\n      \"cidade\": \"Campinas\",\n      \"uf\": \"SP\",\n      \"cep\": \"13010-100\"\n  },\n  \"data_prevista\": \"{{dataPrevista}}\",\n  \"valor_frete\": 27.50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas/{{idEntrega}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('dados atualizados', () => { const e = pm.response.json(); pm.expect(e.nome_destinatario).to.eql('Maria Souza Lima'); pm.expect(e.valor_frete).to.eql(27.5); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /status — EM_TRANSITO",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_entrega\": \"EM_TRANSITO\",\n  \"observacao\": \"Coletado na loja\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas/{{idEntrega}}/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('novo status', () => pm.expect(pm.response.json().status_entrega).to.eql('EM_TRANSITO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /status — SAIU_PARA_ENTREGA",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_entrega\": \"SAIU_PARA_ENTREGA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas/{{idEntrega}}/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /status — ENTREGUE",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_entrega\": \"ENTREGUE\",\n  \"data_entrega\": \"{{hoje}}\",\n  \"observacao\": \"Recebido pela destinatária\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas/{{idEntrega}}/status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('entregue com data', () => { const e = pm.response.json(); pm.expect(e.status_entrega).to.eql('ENTREGUE'); pm.expect(e.data_entrega).to.eql(pm.collectionVariables.get('hoje')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /entregas/{id}/historico",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas/{{idEntrega}}/historico"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('4 mudanças em ordem', () => pm.expect(pm.response.json().dados.map(h => h.status_entrega)).to.eql(['AGUARDANDO_COLETA', 'EM_TRANSITO', 'SAIU_PARA_ENTREGA', 'ENTREGUE']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /entregas — paginação",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas?pagina=1&tamanho=5"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('respeita o tamanho', () => { const j = pm.response.json(); pm.expect(j.dados.length).to.be.at.most(5); pm.expect(j.paginacao.tamanho).to.eql(5); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Exclusão",
+      "item": [
+        {
+          "name": "POST /entregas — cadastrar para excluir",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": {{idPedidoExclusao}},\n  \"id_cliente\": 1034,\n  \"nome_destinatario\": \"Maria Souza\",\n  \"transportadora\": \"Correios\",\n  \"endereco_destino\": {\n      \"logradouro\": \"Rua das Flores\",\n      \"numero\": \"120\",\n      \"complemento\": \"Apto 32\",\n      \"bairro\": \"Centro\",\n      \"cidade\": \"Campinas\",\n      \"uf\": \"SP\",\n      \"cep\": \"13010-100\"\n  },\n  \"data_prevista\": \"{{dataPrevista}}\",\n  \"valor_frete\": 25.90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('idEntregaExclusao', String(pm.response.json().id_entrega));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /entregas/{id} — 204",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas/{{idEntregaExclusao}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "pm.test('sem corpo', () => pm.expect(pm.response.text()).to.eql(''));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /entregas/{id} — 404 após exclusão",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas/{{idEntregaExclusao}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('erro.codigo = NAO_ENCONTRADO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('NAO_ENCONTRADO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Cenários de erro",
+      "description": "Cada requisição provoca um erro do contrato. Rode depois da pasta 01.",
+      "item": [
+        {
+          "name": "401 — sem X-API-Key",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('erro.codigo = NAO_AUTENTICADO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('NAO_AUTENTICADO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "403 — chave somente leitura (G2) em POST",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyLeitura}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 1,\n  \"id_cliente\": 1034,\n  \"nome_destinatario\": \"Maria Souza\",\n  \"transportadora\": \"Correios\",\n  \"endereco_destino\": {\n      \"logradouro\": \"Rua das Flores\",\n      \"numero\": \"120\",\n      \"complemento\": \"Apto 32\",\n      \"bairro\": \"Centro\",\n      \"cidade\": \"Campinas\",\n      \"uf\": \"SP\",\n      \"cep\": \"13010-100\"\n  },\n  \"data_prevista\": \"{{dataPrevista}}\",\n  \"valor_frete\": 25.90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('erro.codigo = SEM_PERMISSAO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('SEM_PERMISSAO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 — JSON malformado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id_pedido\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('erro.codigo = REQUISICAO_INVALIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('REQUISICAO_INVALIDA'); pm.expect(j.request_id).to.be.a('string'); });",
+                  "pm.test('detalhes presentes', () => pm.expect(pm.response.json().erro.detalhes).to.have.length.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 — campo obrigatório ausente e tipo errado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 1,\n  \"nome_destinatario\": \"Maria Souza\",\n  \"transportadora\": \"Correios\",\n  \"endereco_destino\": {\n    \"logradouro\": \"Rua das Flores\",\n    \"numero\": \"120\",\n    \"complemento\": \"Apto 32\",\n    \"bairro\": \"Centro\",\n    \"cidade\": \"Campinas\",\n    \"uf\": \"SP\",\n    \"cep\": \"13010-100\"\n  },\n  \"data_prevista\": \"2030-01-01\",\n  \"valor_frete\": \"caro\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('erro.codigo = REQUISICAO_INVALIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('REQUISICAO_INVALIDA'); pm.expect(j.request_id).to.be.a('string'); });",
+                  "pm.test('lista cada campo', () => pm.expect(pm.response.json().erro.detalhes.map(d => d.campo)).to.include.members(['id_cliente', 'valor_frete']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 — id inválido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas/abc"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('erro.codigo = REQUISICAO_INVALIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('REQUISICAO_INVALIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 — data no passado e UF inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": 999991,\n  \"id_cliente\": 1,\n  \"nome_destinatario\": \"Maria Souza\",\n  \"transportadora\": \"Correios\",\n  \"endereco_destino\": {\n    \"logradouro\": \"Rua das Flores\",\n    \"numero\": \"120\",\n    \"complemento\": \"Apto 32\",\n    \"bairro\": \"Centro\",\n    \"cidade\": \"Campinas\",\n    \"uf\": \"XX\",\n    \"cep\": \"13010-100\"\n  },\n  \"data_prevista\": \"2020-01-01\",\n  \"valor_frete\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('erro.codigo = VALIDACAO_SEMANTICA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('VALIDACAO_SEMANTICA'); pm.expect(j.request_id).to.be.a('string'); });",
+                  "pm.test('detalha os dois campos', () => pm.expect(pm.response.json().erro.detalhes.map(d => d.campo)).to.include.members(['data_prevista', 'endereco_destino.uf']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 — entrega ativa duplicada para o pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_pedido\": {{idPedido}},\n  \"id_cliente\": 1034,\n  \"nome_destinatario\": \"Maria Souza\",\n  \"transportadora\": \"Correios\",\n  \"endereco_destino\": {\n      \"logradouro\": \"Rua das Flores\",\n      \"numero\": \"120\",\n      \"complemento\": \"Apto 32\",\n      \"bairro\": \"Centro\",\n      \"cidade\": \"Campinas\",\n      \"uf\": \"SP\",\n      \"cep\": \"13010-100\"\n  },\n  \"data_prevista\": \"{{dataPrevista}}\",\n  \"valor_frete\": 25.90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas",
+            "description": "Depende da pasta 01 (a entrega do idPedido continua ativa, ENTREGUE)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('erro.codigo = ENTREGA_DUPLICADA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('ENTREGA_DUPLICADA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 — transição de status inválida",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status_entrega\": \"EM_TRANSITO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas/{{idEntrega}}/status",
+            "description": "ENTREGUE é status final."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('erro.codigo = TRANSICAO_INVALIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('TRANSICAO_INVALIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 — PUT em entrega que não permite edição",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome_destinatario\": \"Maria Souza\",\n  \"transportadora\": \"Correios\",\n  \"endereco_destino\": {\n      \"logradouro\": \"Rua das Flores\",\n      \"numero\": \"120\",\n      \"complemento\": \"Apto 32\",\n      \"bairro\": \"Centro\",\n      \"cidade\": \"Campinas\",\n      \"uf\": \"SP\",\n      \"cep\": \"13010-100\"\n  },\n  \"data_prevista\": \"{{dataPrevista}}\",\n  \"valor_frete\": 25.90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/entregas/{{idEntrega}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('erro.codigo = OPERACAO_NAO_PERMITIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('OPERACAO_NAO_PERMITIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 — DELETE em entrega já coletada",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas/{{idEntrega}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('erro.codigo = OPERACAO_NAO_PERMITIDA', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('OPERACAO_NAO_PERMITIDA'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 — entrega inexistente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/entregas/99999999"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('erro.codigo = NAO_ENCONTRADO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('NAO_ENCONTRADO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 — rota inexistente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/inexistente"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('erro.codigo = NAO_ENCONTRADO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('NAO_ENCONTRADO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Integração G5 (interno)",
+      "description": "Consumo da API de Pedidos do Grupo 5. Para completar as pendências de uma entrega importada, use PUT /entregas/{id}.",
+      "item": [
+        {
+          "name": "POST /integracoes/pedidos/importar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracoes/pedidos/importar",
+            "description": "Requer a API do G5 no ar (G5_BASE_URL). Cria as entregas dos pedidos CONFIRMADOS e atualiza/cancela as já importadas; campos que o G5 não envia ficam em `pendencias`. Com o G5 fora do ar responde 503 INTEGRACAO_INDISPONIVEL (após 3 repetições, cerca de 7 s)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 (resumo) ou erro de integração documentado', () => pm.expect([200, 502, 503]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) pm.test('resumo completo', () => { const r = pm.response.json(); ['importacao_id', 'consultados', 'inseridos', 'atualizados', 'sem_alteracao', 'ignorados', 'rejeitados'].forEach(k => pm.expect(r).to.have.property(k)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /integracoes/pedidos — pedidos importados",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyLeitura}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracoes/pedidos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /integracoes/logs — ocorrências",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyLeitura}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracoes/logs?limite=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /integracoes/pedidos/importar — 403 com chave de leitura",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKeyLeitura}}"
+              }
+            ],
+            "url": "{{baseUrl}}/integracoes/pedidos/importar"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('erro.codigo = SEM_PERMISSAO', () => { const j = pm.response.json(); pm.expect(j.erro.codigo).to.eql('SEM_PERMISSAO'); pm.expect(j.request_id).to.be.a('string'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

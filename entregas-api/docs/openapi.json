@@ -1,0 +1,1683 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "API de Entregas — Grupo 7",
+    "version": "1.0.0",
+    "description": "Implementação do **Contrato de Integração REST — API de Entregas (Grupo 7)**, versão 1.0.\n\nO Grupo 7 (Entregas) é fornecedor desta API para o Grupo 2 (Vendas) e consome a API de Pedidos do Grupo 5.\n\n**Autenticação:** cabeçalho `X-API-Key`. A chave de leitura/escrita acessa tudo; a chave somente leitura recebe `403` em POST, PUT, PATCH e DELETE. `/health` não exige chave.\n\n**Erros:** todo 4xx/5xx segue o formato padrão (`erro`, `caminho`, `data_hora`, `request_id`). Ordem de verificação: 401, 403, 400, 404, 409, 422.\n\n**Entregas importadas de pedidos do G5** (`origem = PEDIDOS_G5`, `id_pedido` = `codigo_pedido`) nascem com campos nulos listados em `pendencias`; complete-os com `PUT /entregas/{id}`. O G2 localiza a entrega de uma venda por `GET /entregas?id_pedido={numero da venda}`."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5007/api/v1",
+      "description": "Ambiente local"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Entregas",
+      "description": "Contrato com o Grupo 2 (Vendas): consulta de entregas e histórico"
+    },
+    {
+      "name": "Saúde",
+      "description": "Disponibilidade da API"
+    },
+    {
+      "name": "Integração G5 (interno)",
+      "description": "Consumo da API de Pedidos do Grupo 5; uso do próprio Grupo 7"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Saúde"
+        ],
+        "summary": "Verificar disponibilidade da API",
+        "description": "Não exige X-API-Key. Consulta o banco; se estiver fora, retorna 503.",
+        "responses": {
+          "200": {
+            "description": "API disponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "UP"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/ServicoIndisponivel"
+          }
+        }
+      }
+    },
+    "/entregas": {
+      "get": {
+        "tags": [
+          "Entregas"
+        ],
+        "summary": "Listar entregas",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          },
+          {
+            "name": "id_pedido",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "status_entrega",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/StatusEntrega"
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista paginada (vazia retorna 200 com `dados: []`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaEntregas"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequisicaoInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErroInterno"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServicoIndisponivel"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Entregas"
+        ],
+        "summary": "Cadastrar a entrega de um pedido",
+        "description": "Só pode existir uma entrega ativa (status diferente de CANCELADA) por `id_pedido`. Status inicial `AGUARDANDO_COLETA`; `codigo_rastreio` gerado pela API.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntregaCriar"
+              },
+              "example": {
+                "id_pedido": 5012,
+                "id_cliente": 1034,
+                "nome_destinatario": "Maria Souza",
+                "transportadora": "Correios",
+                "endereco_destino": {
+                  "logradouro": "Rua das Flores",
+                  "numero": "120",
+                  "complemento": "Apto 32",
+                  "bairro": "Centro",
+                  "cidade": "Campinas",
+                  "uf": "SP",
+                  "cep": "13010-100"
+                },
+                "data_prevista": "2026-11-20",
+                "valor_frete": 25.9
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Entrega criada",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "example": "/api/v1/entregas/701"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Entrega"
+                },
+                "example": {
+                  "id_entrega": 701,
+                  "codigo_rastreio": "ENT-2026-000701",
+                  "id_pedido": 5012,
+                  "id_cliente": 1034,
+                  "nome_destinatario": "Maria Souza",
+                  "transportadora": "Correios",
+                  "endereco_destino": {
+                    "logradouro": "Rua das Flores",
+                    "numero": "120",
+                    "complemento": "Apto 32",
+                    "bairro": "Centro",
+                    "cidade": "Campinas",
+                    "uf": "SP",
+                    "cep": "13010-100"
+                  },
+                  "data_prevista": "2026-11-20",
+                  "valor_frete": 25.9,
+                  "status_entrega": "AGUARDANDO_COLETA",
+                  "data_entrega": null,
+                  "origem": "API",
+                  "pendencias": [],
+                  "data_criacao": "2026-11-11T20:40:00-03:00",
+                  "data_atualizacao": "2026-11-11T20:40:00-03:00"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequisicaoInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SemPermissao"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflito"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidacaoSemantica"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErroInterno"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServicoIndisponivel"
+          }
+        }
+      }
+    },
+    "/entregas/{id_entrega}": {
+      "get": {
+        "tags": [
+          "Entregas"
+        ],
+        "summary": "Consultar uma entrega",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdEntrega"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entrega",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Entrega"
+                },
+                "example": {
+                  "id_entrega": 701,
+                  "codigo_rastreio": "ENT-2026-000701",
+                  "id_pedido": 5012,
+                  "id_cliente": 1034,
+                  "nome_destinatario": "Maria Souza",
+                  "transportadora": "Correios",
+                  "endereco_destino": {
+                    "logradouro": "Rua das Flores",
+                    "numero": "120",
+                    "complemento": "Apto 32",
+                    "bairro": "Centro",
+                    "cidade": "Campinas",
+                    "uf": "SP",
+                    "cep": "13010-100"
+                  },
+                  "data_prevista": "2026-11-20",
+                  "valor_frete": 25.9,
+                  "status_entrega": "AGUARDANDO_COLETA",
+                  "data_entrega": null,
+                  "origem": "API",
+                  "pendencias": [],
+                  "data_criacao": "2026-11-11T20:40:00-03:00",
+                  "data_atualizacao": "2026-11-11T20:40:00-03:00"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequisicaoInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          },
+          "404": {
+            "$ref": "#/components/responses/NaoEncontrado"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErroInterno"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServicoIndisponivel"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Entregas"
+        ],
+        "summary": "Atualizar dados cadastrais da entrega",
+        "description": "Substituição completa dos campos editáveis. Permitido apenas com status `AGUARDANDO_COLETA` ou `EM_TRANSITO` (senão 409).\n\n- `id_pedido`: imutável. `id_cliente`: imutável, exceto para preencher a pendência de entregas importadas do G5.\n- `status_entrega` e `data_entrega` só mudam por `PATCH /status`: valor diferente do gravado retorna 422.\n- `data_prevista` só é revalidada (não pode ser no passado) se mudou.\n- Campos somente leitura e desconhecidos são ignorados.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdEntrega"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntregaAtualizar"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Entrega atualizada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Entrega"
+                },
+                "example": {
+                  "id_entrega": 701,
+                  "codigo_rastreio": "ENT-2026-000701",
+                  "id_pedido": 5012,
+                  "id_cliente": 1034,
+                  "nome_destinatario": "Maria Souza",
+                  "transportadora": "Correios",
+                  "endereco_destino": {
+                    "logradouro": "Rua das Flores",
+                    "numero": "120",
+                    "complemento": "Apto 32",
+                    "bairro": "Centro",
+                    "cidade": "Campinas",
+                    "uf": "SP",
+                    "cep": "13010-100"
+                  },
+                  "data_prevista": "2026-11-20",
+                  "valor_frete": 25.9,
+                  "status_entrega": "AGUARDANDO_COLETA",
+                  "data_entrega": null,
+                  "origem": "API",
+                  "pendencias": [],
+                  "data_criacao": "2026-11-11T20:40:00-03:00",
+                  "data_atualizacao": "2026-11-11T20:40:00-03:00"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequisicaoInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SemPermissao"
+          },
+          "404": {
+            "$ref": "#/components/responses/NaoEncontrado"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflito"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidacaoSemantica"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErroInterno"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServicoIndisponivel"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Entregas"
+        ],
+        "summary": "Excluir uma entrega ainda não coletada",
+        "description": "Só com status `AGUARDANDO_COLETA`; nos demais casos use `PATCH` com `CANCELADA`.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdEntrega"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Entrega excluída (sem corpo)"
+          },
+          "400": {
+            "$ref": "#/components/responses/RequisicaoInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SemPermissao"
+          },
+          "404": {
+            "$ref": "#/components/responses/NaoEncontrado"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflito"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErroInterno"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServicoIndisponivel"
+          }
+        }
+      }
+    },
+    "/entregas/{id_entrega}/status": {
+      "patch": {
+        "tags": [
+          "Entregas"
+        ],
+        "summary": "Alterar o status da entrega",
+        "description": "Aceita apenas as transições do contrato; qualquer outra (inclusive para o mesmo status) retorna 409.\n\n| De | Para |\n|---|---|\n| AGUARDANDO_COLETA | EM_TRANSITO, CANCELADA |\n| EM_TRANSITO | SAIU_PARA_ENTREGA, CANCELADA |\n| SAIU_PARA_ENTREGA | ENTREGUE, NAO_ENTREGUE |\n| NAO_ENTREGUE | SAIU_PARA_ENTREGA, DEVOLVIDA |\n| ENTREGUE, DEVOLVIDA, CANCELADA | (final) |\n\n`data_entrega` é obrigatória e não pode ser futura quando o status é `ENTREGUE`, e proibida nos demais.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdEntrega"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlterarStatus"
+              },
+              "example": {
+                "status_entrega": "ENTREGUE",
+                "data_entrega": "2026-11-18",
+                "observacao": "Recebido pela destinatária"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Entrega com o novo status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Entrega"
+                },
+                "example": {
+                  "id_entrega": 701,
+                  "codigo_rastreio": "ENT-2026-000701",
+                  "id_pedido": 5012,
+                  "id_cliente": 1034,
+                  "nome_destinatario": "Maria Souza",
+                  "transportadora": "Correios",
+                  "endereco_destino": {
+                    "logradouro": "Rua das Flores",
+                    "numero": "120",
+                    "complemento": "Apto 32",
+                    "bairro": "Centro",
+                    "cidade": "Campinas",
+                    "uf": "SP",
+                    "cep": "13010-100"
+                  },
+                  "data_prevista": "2026-11-20",
+                  "valor_frete": 25.9,
+                  "status_entrega": "AGUARDANDO_COLETA",
+                  "data_entrega": null,
+                  "origem": "API",
+                  "pendencias": [],
+                  "data_criacao": "2026-11-11T20:40:00-03:00",
+                  "data_atualizacao": "2026-11-11T20:40:00-03:00"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequisicaoInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SemPermissao"
+          },
+          "404": {
+            "$ref": "#/components/responses/NaoEncontrado"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflito"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidacaoSemantica"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErroInterno"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServicoIndisponivel"
+          }
+        }
+      }
+    },
+    "/entregas/{id_entrega}/historico": {
+      "get": {
+        "tags": [
+          "Entregas"
+        ],
+        "summary": "Consultar o histórico de status",
+        "description": "Da mudança mais antiga para a mais recente.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdEntrega"
+          },
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Histórico",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaHistorico"
+                },
+                "example": {
+                  "dados": [
+                    {
+                      "status_entrega": "AGUARDANDO_COLETA",
+                      "data_hora": "2026-11-11T20:40:00-03:00",
+                      "observacao": null
+                    },
+                    {
+                      "status_entrega": "EM_TRANSITO",
+                      "data_hora": "2026-11-12T09:15:00-03:00",
+                      "observacao": "Coletado na loja"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequisicaoInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          },
+          "404": {
+            "$ref": "#/components/responses/NaoEncontrado"
+          },
+          "500": {
+            "$ref": "#/components/responses/ErroInterno"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServicoIndisponivel"
+          }
+        }
+      }
+    },
+    "/integracoes/pedidos/importar": {
+      "post": {
+        "tags": [
+          "Integração G5 (interno)"
+        ],
+        "summary": "Importar pedidos do G5 e criar/atualizar/cancelar entregas",
+        "description": "Consome `GET /integracao/pedidos` da API de Pedidos (G5), página por página, e valida cada pedido contra o Contrato B. Regras:\n\n- **Inclusão:** pedido `CONFIRMADO` que o G7 ainda não tem cria a entrega (`id_pedido` = `codigo_pedido`, `id_cliente` = `codigo_cliente`). O que o G5 não fornece fica em `pendencias`.\n- **Atualização:** `data_atualizacao` mais recente atualiza o endereço da entrega (só enquanto `AGUARDANDO_COLETA` ou `EM_TRANSITO`; depois, `REGRA_NEGOCIO` para tratamento manual).\n- **Cancelamento:** pedido `CANCELADO` cancela a entrega (se ainda não saiu para entrega). `CANCELADO` que nunca chegou confirmado é ignorado, sem erro.\n- **Rejeições:** campo obrigatório nulo (`CAMPO_OBRIGATORIO`), tipo errado (`TIPO_INVALIDO`), CEP/UF/valor/quantidade/data inválidos (`VALOR_INVALIDO`), `codigo_pedido` repetido (`REGISTRO_DUPLICADO`) e `REGRA_NEGOCIO`. Um pedido com problema não interrompe os demais e volta a ser lido na próxima execução.\n- **Idempotente:** reexecutar não duplica (`pedidos_importados` guarda a última leitura).\n- **Comunicação:** timeout de 5 s, até 3 repetições (1, 2 e 4 s) em falha de rede, timeout e 503; 500/502 repetem uma vez; 4xx não repetem.\n\nRequer a chave de escrita. Equivalente ao script `npm run importar:pedidos`.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumo da importação",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumoImportacao"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SemPermissao"
+          },
+          "502": {
+            "description": "G5 fora do contrato, recusou a chave ou respondeu erro",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "erro": {
+                    "status": 502,
+                    "codigo": "INTEGRACAO_CONTRATO_INVALIDO",
+                    "mensagem": "G5 fora do contrato, recusou a chave ou respondeu erro",
+                    "detalhes": []
+                  },
+                  "caminho": "/api/v1/entregas",
+                  "data_hora": "2026-11-11T20:45:10-03:00",
+                  "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API de Pedidos (G5) indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "erro": {
+                    "status": 503,
+                    "codigo": "INTEGRACAO_INDISPONIVEL",
+                    "mensagem": "API de Pedidos (G5) indisponível",
+                    "detalhes": []
+                  },
+                  "caminho": "/api/v1/entregas",
+                  "data_hora": "2026-11-11T20:45:10-03:00",
+                  "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/integracoes/pedidos": {
+      "get": {
+        "tags": [
+          "Integração G5 (interno)"
+        ],
+        "summary": "Listar pedidos já importados do G5",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pedidos importados, do maior código para o menor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PedidoImportado"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequisicaoInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          }
+        }
+      }
+    },
+    "/integracoes/logs": {
+      "get": {
+        "tags": [
+          "Integração G5 (interno)"
+        ],
+        "summary": "Consultar o registro de ocorrências da integração com o G5",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/XRequestId"
+          },
+          {
+            "name": "importacao_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logs, do mais recente para o mais antigo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dados": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LogIntegracao"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequisicaoInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/NaoAutenticado"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Chave de leitura/escrita ou chave somente leitura (403 em métodos de escrita)."
+      }
+    },
+    "parameters": {
+      "IdEntrega": {
+        "name": "id_entrega",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "example": 701
+      },
+      "XRequestId": {
+        "name": "X-Request-Id",
+        "in": "header",
+        "required": false,
+        "description": "UUID gerado pelo consumidor. Devolvido na resposta e no corpo de erro; a API gera um se ausente.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "responses": {
+      "RequisicaoInvalida": {
+        "description": "JSON malformado, campo obrigatório ausente, tipo errado, Content-Type inválido ou parâmetro inválido",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Erro"
+            },
+            "example": {
+              "erro": {
+                "status": 400,
+                "codigo": "REQUISICAO_INVALIDA",
+                "mensagem": "JSON malformado, campo obrigatório ausente, tipo errado, Content-Type inválido ou parâmetro inválido",
+                "detalhes": [
+                  {
+                    "campo": "id_cliente",
+                    "problema": "campo obrigatório"
+                  }
+                ]
+              },
+              "caminho": "/api/v1/entregas",
+              "data_hora": "2026-11-11T20:45:10-03:00",
+              "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+            }
+          }
+        }
+      },
+      "NaoAutenticado": {
+        "description": "X-API-Key ausente ou inválida",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Erro"
+            },
+            "example": {
+              "erro": {
+                "status": 401,
+                "codigo": "NAO_AUTENTICADO",
+                "mensagem": "X-API-Key ausente ou inválida",
+                "detalhes": []
+              },
+              "caminho": "/api/v1/entregas",
+              "data_hora": "2026-11-11T20:45:10-03:00",
+              "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+            }
+          }
+        }
+      },
+      "SemPermissao": {
+        "description": "Chave sem permissão de escrita",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Erro"
+            },
+            "example": {
+              "erro": {
+                "status": 403,
+                "codigo": "SEM_PERMISSAO",
+                "mensagem": "Chave sem permissão de escrita",
+                "detalhes": []
+              },
+              "caminho": "/api/v1/entregas",
+              "data_hora": "2026-11-11T20:45:10-03:00",
+              "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+            }
+          }
+        }
+      },
+      "NaoEncontrado": {
+        "description": "Entrega ou rota inexistente",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Erro"
+            },
+            "example": {
+              "erro": {
+                "status": 404,
+                "codigo": "NAO_ENCONTRADO",
+                "mensagem": "Entrega ou rota inexistente",
+                "detalhes": []
+              },
+              "caminho": "/api/v1/entregas",
+              "data_hora": "2026-11-11T20:45:10-03:00",
+              "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+            }
+          }
+        }
+      },
+      "Conflito": {
+        "description": "ENTREGA_DUPLICADA, TRANSICAO_INVALIDA ou OPERACAO_NAO_PERMITIDA",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Erro"
+            },
+            "example": {
+              "erro": {
+                "status": 409,
+                "codigo": "ENTREGA_DUPLICADA",
+                "mensagem": "ENTREGA_DUPLICADA, TRANSICAO_INVALIDA ou OPERACAO_NAO_PERMITIDA",
+                "detalhes": []
+              },
+              "caminho": "/api/v1/entregas",
+              "data_hora": "2026-11-11T20:45:10-03:00",
+              "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+            }
+          }
+        }
+      },
+      "ValidacaoSemantica": {
+        "description": "Valor com tipo correto que viola formato, faixa ou regra de negócio",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Erro"
+            },
+            "example": {
+              "erro": {
+                "status": 422,
+                "codigo": "VALIDACAO_SEMANTICA",
+                "mensagem": "Valor com tipo correto que viola formato, faixa ou regra de negócio",
+                "detalhes": [
+                  {
+                    "campo": "data_prevista",
+                    "problema": "não pode ser anterior a 2026-11-11"
+                  },
+                  {
+                    "campo": "endereco_destino.uf",
+                    "problema": "UF 'XX' inexistente"
+                  }
+                ]
+              },
+              "caminho": "/api/v1/entregas",
+              "data_hora": "2026-11-11T20:45:10-03:00",
+              "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+            }
+          }
+        }
+      },
+      "ErroInterno": {
+        "description": "Erro inesperado no servidor",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Erro"
+            },
+            "example": {
+              "erro": {
+                "status": 500,
+                "codigo": "ERRO_INTERNO",
+                "mensagem": "Erro inesperado no servidor",
+                "detalhes": []
+              },
+              "caminho": "/api/v1/entregas",
+              "data_hora": "2026-11-11T20:45:10-03:00",
+              "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+            }
+          }
+        }
+      },
+      "ServicoIndisponivel": {
+        "description": "API ou banco de dados temporariamente indisponível",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Erro"
+            },
+            "example": {
+              "erro": {
+                "status": 503,
+                "codigo": "SERVICO_INDISPONIVEL",
+                "mensagem": "API ou banco de dados temporariamente indisponível",
+                "detalhes": []
+              },
+              "caminho": "/api/v1/entregas",
+              "data_hora": "2026-11-11T20:45:10-03:00",
+              "request_id": "3f6c1e2a-8b7d-4c11-9a52-0e4b7d9f1a23"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "description": "Segundos até a nova tentativa",
+            "schema": {
+              "type": "integer",
+              "example": 5
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "StatusEntrega": {
+        "type": "string",
+        "enum": [
+          "AGUARDANDO_COLETA",
+          "EM_TRANSITO",
+          "SAIU_PARA_ENTREGA",
+          "ENTREGUE",
+          "NAO_ENTREGUE",
+          "DEVOLVIDA",
+          "CANCELADA"
+        ]
+      },
+      "EnderecoDestinoEntrada": {
+        "type": "object",
+        "required": [
+          "logradouro",
+          "numero",
+          "bairro",
+          "cidade",
+          "uf",
+          "cep"
+        ],
+        "properties": {
+          "logradouro": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "numero": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10,
+            "description": "Aceita \"S/N\""
+          },
+          "complemento": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "bairro": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          },
+          "cidade": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          },
+          "uf": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "Uma das 27 UFs, maiúscula"
+          },
+          "cep": {
+            "type": "string",
+            "pattern": "^\\d{5}-\\d{3}$"
+          }
+        }
+      },
+      "EnderecoDestino": {
+        "type": "object",
+        "description": "`numero` e `bairro` podem ser nulos em entregas importadas do G5 (ver `pendencias`).",
+        "properties": {
+          "logradouro": {
+            "type": "string"
+          },
+          "numero": {
+            "type": "string",
+            "nullable": true
+          },
+          "complemento": {
+            "type": "string",
+            "nullable": true
+          },
+          "bairro": {
+            "type": "string",
+            "nullable": true
+          },
+          "cidade": {
+            "type": "string"
+          },
+          "uf": {
+            "type": "string"
+          },
+          "cep": {
+            "type": "string"
+          }
+        }
+      },
+      "EntregaCriar": {
+        "type": "object",
+        "required": [
+          "id_pedido",
+          "id_cliente",
+          "nome_destinatario",
+          "transportadora",
+          "endereco_destino",
+          "data_prevista",
+          "valor_frete"
+        ],
+        "properties": {
+          "id_pedido": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Único entre entregas não canceladas"
+          },
+          "id_cliente": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nome_destinatario": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100
+          },
+          "transportadora": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          },
+          "endereco_destino": {
+            "$ref": "#/components/schemas/EnderecoDestinoEntrada"
+          },
+          "data_prevista": {
+            "type": "string",
+            "format": "date",
+            "description": "Não pode ser anterior à data atual (America/Sao_Paulo)"
+          },
+          "valor_frete": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999.99,
+            "description": "Até 2 casas decimais"
+          }
+        }
+      },
+      "EntregaAtualizar": {
+        "type": "object",
+        "required": [
+          "nome_destinatario",
+          "transportadora",
+          "endereco_destino",
+          "data_prevista",
+          "valor_frete"
+        ],
+        "properties": {
+          "nome_destinatario": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100
+          },
+          "transportadora": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          },
+          "endereco_destino": {
+            "$ref": "#/components/schemas/EnderecoDestinoEntrada"
+          },
+          "data_prevista": {
+            "type": "string",
+            "format": "date"
+          },
+          "valor_frete": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999.99
+          },
+          "id_cliente": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Só aceito para preencher a pendência de entrega importada; depois é imutável"
+          },
+          "id_pedido": {
+            "type": "integer",
+            "description": "Opcional; se enviado, deve ser igual ao gravado"
+          }
+        },
+        "example": {
+          "nome_destinatario": "Maria Souza Lima",
+          "transportadora": "Correios",
+          "endereco_destino": {
+            "logradouro": "Rua das Flores",
+            "numero": "120",
+            "complemento": "Apto 32",
+            "bairro": "Centro",
+            "cidade": "Campinas",
+            "uf": "SP",
+            "cep": "13010-100"
+          },
+          "data_prevista": "2026-11-22",
+          "valor_frete": 25.9
+        }
+      },
+      "AlterarStatus": {
+        "type": "object",
+        "required": [
+          "status_entrega"
+        ],
+        "properties": {
+          "status_entrega": {
+            "$ref": "#/components/schemas/StatusEntrega"
+          },
+          "observacao": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "data_entrega": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Obrigatória com ENTREGUE (não futura); proibida nos demais"
+          }
+        }
+      },
+      "Entrega": {
+        "type": "object",
+        "properties": {
+          "id_entrega": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "codigo_rastreio": {
+            "type": "string",
+            "readOnly": true,
+            "example": "ENT-2026-000701"
+          },
+          "id_pedido": {
+            "type": "integer"
+          },
+          "id_cliente": {
+            "type": "integer",
+            "nullable": true
+          },
+          "nome_destinatario": {
+            "type": "string"
+          },
+          "transportadora": {
+            "type": "string",
+            "nullable": true
+          },
+          "endereco_destino": {
+            "$ref": "#/components/schemas/EnderecoDestino"
+          },
+          "data_prevista": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "valor_frete": {
+            "type": "number",
+            "nullable": true
+          },
+          "status_entrega": {
+            "$ref": "#/components/schemas/StatusEntrega"
+          },
+          "data_entrega": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "origem": {
+            "type": "string",
+            "enum": [
+              "API",
+              "PEDIDOS_G5"
+            ],
+            "description": "PEDIDOS_G5: criada pela importação de pedidos do G5"
+          },
+          "pendencias": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Campos ainda nulos a completar via PUT (vazia em entregas cadastradas pelo POST)",
+            "example": [
+              "id_cliente",
+              "transportadora",
+              "valor_frete"
+            ]
+          },
+          "data_criacao": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "data_atualizacao": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        }
+      },
+      "ListaEntregas": {
+        "type": "object",
+        "properties": {
+          "dados": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Entrega"
+            }
+          },
+          "paginacao": {
+            "type": "object",
+            "properties": {
+              "pagina": {
+                "type": "integer"
+              },
+              "tamanho": {
+                "type": "integer"
+              },
+              "total_registros": {
+                "type": "integer"
+              },
+              "total_paginas": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "HistoricoItem": {
+        "type": "object",
+        "properties": {
+          "status_entrega": {
+            "$ref": "#/components/schemas/StatusEntrega"
+          },
+          "data_hora": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observacao": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ListaHistorico": {
+        "type": "object",
+        "properties": {
+          "dados": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoricoItem"
+            }
+          }
+        }
+      },
+      "Erro": {
+        "type": "object",
+        "properties": {
+          "erro": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer"
+              },
+              "codigo": {
+                "type": "string",
+                "enum": [
+                  "REQUISICAO_INVALIDA",
+                  "NAO_AUTENTICADO",
+                  "SEM_PERMISSAO",
+                  "NAO_ENCONTRADO",
+                  "ENTREGA_DUPLICADA",
+                  "TRANSICAO_INVALIDA",
+                  "OPERACAO_NAO_PERMITIDA",
+                  "VALIDACAO_SEMANTICA",
+                  "ERRO_INTERNO",
+                  "SERVICO_INDISPONIVEL",
+                  "INTEGRACAO_INDISPONIVEL",
+                  "INTEGRACAO_CONTRATO_INVALIDO",
+                  "INTEGRACAO_AUTENTICACAO",
+                  "INTEGRACAO_ERRO"
+                ]
+              },
+              "mensagem": {
+                "type": "string"
+              },
+              "detalhes": {
+                "type": "array",
+                "description": "Obrigatório (não vazio) em 400 e 422",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "campo": {
+                      "type": "string"
+                    },
+                    "problema": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "caminho": {
+            "type": "string"
+          },
+          "data_hora": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ResumoImportacao": {
+        "type": "object",
+        "properties": {
+          "importacao_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "consultados": {
+            "type": "integer",
+            "description": "Pedidos lidos do G5 (válidos e inválidos)"
+          },
+          "inseridos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "codigo_pedido": {
+                  "type": "integer"
+                },
+                "id_entrega": {
+                  "type": "integer"
+                },
+                "codigo_rastreio": {
+                  "type": "string"
+                },
+                "pendencias": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "atualizados": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "codigo_pedido": {
+                  "type": "integer"
+                },
+                "acao": {
+                  "type": "string",
+                  "enum": [
+                    "ENDERECO_ATUALIZADO",
+                    "ENTREGA_CANCELADA",
+                    "DADOS_ATUALIZADOS"
+                  ]
+                }
+              }
+            }
+          },
+          "sem_alteracao": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "codigo_pedido sem mudança desde a última leitura"
+          },
+          "ignorados": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "codigo_pedido": {
+                  "type": "integer"
+                },
+                "motivo": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "rejeitados": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "codigo_pedido": {
+                  "type": "integer",
+                  "nullable": true
+                },
+                "tipo_erro": {
+                  "type": "string",
+                  "enum": [
+                    "CAMPO_OBRIGATORIO",
+                    "TIPO_INVALIDO",
+                    "VALOR_INVALIDO",
+                    "REGISTRO_DUPLICADO",
+                    "REGRA_NEGOCIO"
+                  ]
+                },
+                "campo": {
+                  "type": "string"
+                },
+                "motivo": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PedidoImportado": {
+        "type": "object",
+        "description": "Última leitura do pedido no G5 (campos do Contrato B).",
+        "properties": {
+          "codigo_pedido": {
+            "type": "integer"
+          },
+          "codigo_cliente": {
+            "type": "integer"
+          },
+          "nome_cliente": {
+            "type": "string"
+          },
+          "endereco_entrega": {
+            "type": "string"
+          },
+          "cidade_entrega": {
+            "type": "string"
+          },
+          "uf_entrega": {
+            "type": "string"
+          },
+          "cep_entrega": {
+            "type": "string"
+          },
+          "data_pedido": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quantidade_itens": {
+            "type": "integer"
+          },
+          "valor_total": {
+            "type": "number"
+          },
+          "status_pedido": {
+            "type": "string",
+            "enum": [
+              "CONFIRMADO",
+              "CANCELADO"
+            ]
+          },
+          "origem_atualizado_em": {
+            "type": "string",
+            "format": "date-time",
+            "description": "data_atualizacao do G5 na última leitura"
+          },
+          "id_entrega": {
+            "type": "integer",
+            "nullable": true
+          },
+          "ultima_importacao_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "importado_em": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "atualizado_em": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LogIntegracao": {
+        "type": "object",
+        "properties": {
+          "data_hora": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "importacao_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "metodo": {
+            "type": "string",
+            "example": "GET"
+          },
+          "endpoint": {
+            "type": "string",
+            "example": "/integracao/pedidos?pagina=1&tamanho=100"
+          },
+          "status_http": {
+            "type": "integer",
+            "nullable": true
+          },
+          "tipo_ocorrencia": {
+            "type": "string",
+            "enum": [
+              "SUCESSO",
+              "ERRO_HTTP",
+              "TIMEOUT",
+              "INDISPONIVEL",
+              "VIOLACAO_CONTRATO",
+              "REGISTRO_DUPLICADO",
+              "CONFLITO",
+              "REGRA_NEGOCIO",
+              "IGNORADO",
+              "RECONCILIACAO"
+            ]
+          },
+          "erro_codigo": {
+            "type": "string",
+            "nullable": true,
+            "description": "erro.codigo devolvido pelo G5 ou tipo de erro do Contrato B"
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "acao_tomada": {
+            "type": "string"
+          },
+          "tentativa": {
+            "type": "integer"
+          },
+          "duracao_ms": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}
