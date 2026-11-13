@@ -81,7 +81,10 @@ export const openapi = {
       '**Erros:** formato padrão (`erro`, `caminho`, `data_hora`, `request_id`). Ordem: 401, 403, 400, 404, 409, 422. 400 = estrutura (JSON, campo ausente, tipo errado, parâmetro); 422 = valor com tipo correto que viola formato, faixa ou regra.',
     ].join('\n'),
   },
-  servers: [{ url: 'http://localhost:5005/api/v1', description: 'Ambiente local' }],
+  servers: [
+    { url: 'https://grupo5-apirest.ioshuavps.com.br/api/v1', description: 'Produção (Easypanel)' },
+    { url: 'http://localhost:5005/api/v1', description: 'Ambiente local' },
+  ],
   tags: [
     { name: 'Integração (G7)', description: 'Estrutura de integração consumida pelo Grupo 7' },
     { name: 'Pedidos', description: 'Uso interno do Grupo 5' },

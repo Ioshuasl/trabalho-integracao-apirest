@@ -7,6 +7,10 @@
   },
   "servers": [
     {
+      "url": "https://grupo5-apirest.ioshuavps.com.br/api/v1",
+      "description": "Produção (Easypanel)"
+    },
+    {
       "url": "http://localhost:5005/api/v1",
       "description": "Ambiente local"
     }

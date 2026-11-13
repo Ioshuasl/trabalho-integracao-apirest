@@ -80,7 +80,10 @@ export const openapi = {
       '**Entregas importadas de pedidos do G5** (`origem = PEDIDOS_G5`, `id_pedido` = `codigo_pedido`) nascem com campos nulos listados em `pendencias`; complete-os com `PUT /entregas/{id}`. O G2 localiza a entrega de uma venda por `GET /entregas?id_pedido={numero da venda}`.',
     ].join('\n'),
   },
-  servers: [{ url: 'http://localhost:5007/api/v1', description: 'Ambiente local' }],
+  servers: [
+    { url: 'https://grupo7-apirest.ioshuavps.com.br/api/v1', description: 'Produção (Easypanel)' },
+    { url: 'http://localhost:5007/api/v1', description: 'Ambiente local' },
+  ],
   tags: [
     { name: 'Entregas', description: 'Contrato com o Grupo 2 (Vendas): consulta de entregas e histórico' },
     { name: 'Saúde', description: 'Disponibilidade da API' },
